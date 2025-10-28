@@ -44,11 +44,11 @@ RUN pip3 install --no-cache-dir -r backend/requirements.txt
 
 # 复制后端源码
 COPY backend/*.py ./backend/
-COPY backend/data ./backend/data
 COPY backend/.env ./backend/.env
 
-# 创建必要的目录
-RUN mkdir -p backend/cache backend/logs
+# 创建必要的目录并复制数据文件
+RUN mkdir -p backend/data backend/cache backend/logs
+COPY backend/data ./backend/data
 
 # 复制前端源码（开发模式运行）
 COPY --from=frontend-builder /app /app/frontend
