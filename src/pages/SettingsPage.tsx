@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { CacheManager } from "@/components/CacheManager";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { getApiSecretKey, setApiSecretKey } from "@/utils/apiClient";
 
 const SettingsPage = () => {
   const isMobile = useIsMobile();
@@ -25,6 +26,7 @@ const SettingsPage = () => {
   } = useAPI();
 
   const [formValues, setFormValues] = useState({
+    apiSecretKey: "",
     appKey: "",
     appSecret: "",
     consumerKey: "",
@@ -36,6 +38,7 @@ const SettingsPage = () => {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [showValues, setShowValues] = useState({
+    apiSecretKey: false,
     appKey: false,
     appSecret: false,
     consumerKey: false,
@@ -45,6 +48,7 @@ const SettingsPage = () => {
   // Load current values when component mounts
   useEffect(() => {
     setFormValues({
+      apiSecretKey: getApiSecretKey() || "",
       appKey: appKey || "",
       appSecret: appSecret || "",
       consumerKey: consumerKey || "",
@@ -87,7 +91,13 @@ const SettingsPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate required fields
+    // Validate API Secret Key
+    if (!formValues.apiSecretKey) {
+      toast.error("请设置网站安全密钥");
+      return;
+    }
+    
+    // Validate required OVH API fields
     if (!formValues.appKey || !formValues.appSecret || !formValues.consumerKey) {
       toast.error("请填写所有必填字段");
       return;
@@ -95,15 +105,19 @@ const SettingsPage = () => {
     
     setIsSaving(true);
     try {
+      // 保存网站安全密钥到 localStorage
+      setApiSecretKey(formValues.apiSecretKey);
+      
+      // 保存 OVH API 配置到后端
       await setAPIKeys(formValues);
       const isValid = await checkAuthentication();
       
       if (isValid) {
-        toast.success("API设置已保存并验证");
+        toast.success("所有设置已保存并验证");
         // 自动导航到服务器列表页面
         navigate("/servers");
       } else {
-        toast.warning("API设置已保存，但验证失败");
+        toast.warning("设置已保存，但OVH API验证失败");
       }
     } catch (error) {
       console.error("Error saving settings:", error);
@@ -133,7 +147,54 @@ const SettingsPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           <div className="lg:col-span-2">
             <form onSubmit={handleSubmit} className="cyber-panel p-4 sm:p-6 space-y-4 sm:space-y-6">
+              {/* 网站安全密钥 */}
               <div>
+                <h2 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold mb-3 sm:mb-4`}>🔐 网站安全密钥</h2>
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-4">
+                  <p className="text-xs text-yellow-300">
+                    ⚠️ 此密钥用于保护前后端通信，需要与后端配置保持一致。请妥善保管，不要泄露！
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-cyber-muted mb-1 text-xs sm:text-sm">
+                    API 安全密钥 <span className="text-red-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showValues.apiSecretKey ? "text" : "password"}
+                      name="apiSecretKey"
+                      value={formValues.apiSecretKey}
+                      onChange={handleChange}
+                      className="cyber-input w-full pr-10 text-sm"
+                      placeholder="输入后端.env文件中的API_SECRET_KEY"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => toggleShowValue("apiSecretKey")}
+                      className="absolute inset-y-0 right-0 px-3 text-cyber-muted hover:text-cyber-accent"
+                    >
+                      {showValues.apiSecretKey ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                          <line x1="1" y1="1" x2="23" y2="23"></line>
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                          <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-cyan-400 mt-1">
+                    💡 在 backend/.env 文件中查找 API_SECRET_KEY 的值，并复制到这里
+                  </p>
+                </div>
+              </div>
+              
+              <div className="cyber-grid-line pt-4">
                 <h2 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold mb-3 sm:mb-4`}>OVH API 凭据</h2>
                 
                 <div className="space-y-3 sm:space-y-4">

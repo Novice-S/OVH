@@ -65,28 +65,7 @@ export const CACHE_KEY = 'ovh-servers-cache';
 /**
  * 后端API地址
  */
-export const API_URL = 'http://localhost:5000/api';
-
-/**
- * API通信密钥
- * 用于验证前端请求，防止后端被直接调用
- * 生产环境请更换为复杂的随机字符串
- */
-export const API_SECRET_KEY = 'ovh-phantom-sniper-2024-secret-key';
-
-/**
- * 前端访问密码
- * 用于保护前端页面访问
- * 默认密码：admin123
- * 生产环境请修改此密码！
- */
-export const FRONTEND_PASSWORD = 'admin123';
-
-/**
- * 是否启用前端密码保护
- * 开发环境可以设置为 false，生产环境建议设置为 true
- */
-export const ENABLE_FRONTEND_PASSWORD = true;
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 /**
  * API请求重试次数

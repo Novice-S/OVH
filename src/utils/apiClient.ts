@@ -4,8 +4,32 @@
  */
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
-import { API_URL, API_SECRET_KEY, API_TIMEOUT } from '@/config/constants';
+import { API_URL, API_TIMEOUT } from '@/config/constants';
 import { toast } from 'sonner';
+
+// localStorage 密钥
+const API_SECRET_KEY_STORAGE = 'api_secret_key';
+
+/**
+ * 获取存储的 API 密钥
+ */
+export const getApiSecretKey = (): string => {
+  return localStorage.getItem(API_SECRET_KEY_STORAGE) || '';
+};
+
+/**
+ * 设置 API 密钥
+ */
+export const setApiSecretKey = (key: string): void => {
+  localStorage.setItem(API_SECRET_KEY_STORAGE, key);
+};
+
+/**
+ * 清除 API 密钥
+ */
+export const clearApiSecretKey = (): void => {
+  localStorage.removeItem(API_SECRET_KEY_STORAGE);
+};
 
 /**
  * 创建axios实例
@@ -23,8 +47,11 @@ const apiClient: AxiosInstance = axios.create({
  */
 apiClient.interceptors.request.use(
   (config) => {
-    // 添加API密钥到请求头
-    config.headers['X-API-Key'] = API_SECRET_KEY;
+    // 从 localStorage 获取 API 密钥
+    const apiKey = getApiSecretKey();
+    if (apiKey) {
+      config.headers['X-API-Key'] = apiKey;
+    }
     
     // 添加时间戳（可选，用于防重放攻击）
     config.headers['X-Request-Time'] = Date.now().toString();
