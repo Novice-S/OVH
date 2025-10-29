@@ -199,9 +199,15 @@ const SettingsPage = () => {
                       )}
                     </button>
                   </div>
-                  <p className="text-xs text-cyan-400 mt-1">
-                    💡 在 backend/.env 文件中查找 API_SECRET_KEY 的值，并复制到这里
-                  </p>
+                  <div className="text-xs text-cyan-400 mt-2 space-y-1">
+                    <p>💡 请在 <code className="bg-cyan-500/20 px-1 py-0.5 rounded">backend/.env</code> 文件中查找 <code className="bg-cyan-500/20 px-1 py-0.5 rounded">API_SECRET_KEY</code> 的值并复制到此处</p>
+                    <p className="text-purple-300">
+                      <strong>双重用途：</strong>① API 安全验证  ② 面板解锁密码
+                    </p>
+                    <p className="text-yellow-300">
+                      ⚡ <strong>非首次配置？</strong>只需填写此字段并保存，即可快速解锁进入面板（其他字段无需填写）
+                    </p>
+                  </div>
                 </div>
               </div>
               
@@ -464,6 +470,13 @@ const SettingsPage = () => {
                 </div>
                 
                 <div className="cyber-grid-line pt-4">
+                  <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 mb-4">
+                    <p className="text-xs text-purple-300 font-semibold mb-1.5">🔐 快速解锁提示</p>
+                    <p className="text-xs text-purple-200 leading-relaxed">
+                      如果您已完成初次配置，本页面还可作为<strong>面板解锁功能</strong>使用。只需输入 <strong>API 安全密钥</strong>（其他字段可不填），点击保存即可进入面板。
+                    </p>
+                  </div>
+                  
                   <h3 className="font-medium mb-2">获取 OVH API 密钥</h3>
                   <p className="text-cyber-muted text-sm mb-3">
                     您需要从 OVH API 控制台获取 APP KEY、APP SECRET 和 CONSUMER KEY 才能使用本服务。
@@ -476,9 +489,9 @@ const SettingsPage = () => {
                       href="https://eu.api.ovh.com/createToken/" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="cyber-button text-xs w-full inline-flex items-center justify-center"
+                      className="cyber-button text-xs w-full inline-flex items-center justify-center h-9"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5 flex-shrink-0">
                         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                         <polyline points="15 3 21 3 21 9"></polyline>
                         <line x1="10" y1="14" x2="21" y2="3"></line>
@@ -490,9 +503,9 @@ const SettingsPage = () => {
                       href="https://api.us.ovhcloud.com/createToken/" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="cyber-button text-xs w-full inline-flex items-center justify-center bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20"
+                      className="cyber-button text-xs w-full inline-flex items-center justify-center h-9"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5 flex-shrink-0">
                         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                         <polyline points="15 3 21 3 21 9"></polyline>
                         <line x1="10" y1="14" x2="21" y2="3"></line>
@@ -504,9 +517,9 @@ const SettingsPage = () => {
                       href="https://ca.api.ovh.com/createToken/" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="cyber-button text-xs w-full inline-flex items-center justify-center"
+                      className="cyber-button text-xs w-full inline-flex items-center justify-center h-9"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5 flex-shrink-0">
                         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                         <polyline points="15 3 21 3 21 9"></polyline>
                         <line x1="10" y1="14" x2="21" y2="3"></line>
