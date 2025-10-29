@@ -2472,6 +2472,81 @@ def clear_subscriptions():
     add_log("INFO", f"清空所有订阅 ({count} 项)")
     return jsonify({"status": "success", "count": count, "message": f"已清空 {count} 个订阅"})
 
+@app.route('/api/monitor/subscriptions/batch-add-all', methods=['OPTIONS', 'POST'])
+def batch_add_all_servers():
+    """批量添加所有服务器到监控（全机房监控）"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    
+    global server_plans
+    
+    if not server_plans or len(server_plans) == 0:
+        return jsonify({"status": "error", "message": "服务器列表为空，请先刷新服务器列表"}), 400
+    
+    data = request.json or {}
+    notify_available = data.get("notifyAvailable", True)
+    notify_unavailable = data.get("notifyUnavailable", False)
+    
+    added_count = 0
+    skipped_count = 0
+    errors = []
+    
+    # 获取当前已订阅的服务器列表（避免重复添加）
+    existing_plan_codes = {s.get("planCode") for s in monitor.subscriptions if s.get("planCode")}
+    
+    for server in server_plans:
+        plan_code = server.get("planCode")
+        if not plan_code:
+            continue
+        
+        # 检查是否已订阅
+        if plan_code in existing_plan_codes:
+            skipped_count += 1
+            continue
+        
+        try:
+            # 获取服务器名称
+            server_name = server.get("name")
+            
+            # 添加订阅（datacenters=[] 表示监控所有机房）
+            monitor.add_subscription(
+                plan_code, 
+                datacenters=[],  # 空列表表示监控所有机房
+                notify_available=notify_available,
+                notify_unavailable=notify_unavailable,
+                server_name=server_name
+            )
+            added_count += 1
+            add_log("DEBUG", f"批量添加订阅: {plan_code} ({server_name or '未知名称'})", "monitor")
+        except Exception as e:
+            error_msg = f"{plan_code}: {str(e)}"
+            errors.append(error_msg)
+            add_log("WARNING", f"批量添加订阅失败 {error_msg}", "monitor")
+    
+    # 保存订阅
+    save_subscriptions()
+    
+    # 如果监控未运行，自动启动
+    if not monitor.running:
+        monitor.start()
+        add_log("INFO", "批量添加订阅后自动启动监控", "monitor")
+    
+    message = f"已添加 {added_count} 个服务器到监控（全机房监控）"
+    if skipped_count > 0:
+        message += f"，跳过 {skipped_count} 个已订阅的服务器"
+    if errors:
+        message += f"，{len(errors)} 个失败"
+    
+    add_log("INFO", f"批量添加订阅完成: {message}", "monitor")
+    
+    return jsonify({
+        "status": "success",
+        "added": added_count,
+        "skipped": skipped_count,
+        "errors": errors,
+        "message": message
+    })
+
 @app.route('/api/monitor/subscriptions/<plan_code>/history', methods=['GET'])
 def get_subscription_history(plan_code):
     """获取订阅的历史记录"""

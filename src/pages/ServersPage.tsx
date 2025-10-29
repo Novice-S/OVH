@@ -14,6 +14,16 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Cpu, Database, Wifi, HardDrive, CheckSquare, Square, Settings, ArrowRightLeft, Clock, Bell, Grid, List, Euro, DollarSign, Loader2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { apiEvents } from "@/context/APIContext";
@@ -98,6 +108,7 @@ interface ServerPlan {
 
 const ServersPage = () => {
   const isMobile = useIsMobile();
+  const [showBatchMonitorDialog, setShowBatchMonitorDialog] = useState(false);
   const { isAuthenticated } = useAPI();
   const [servers, setServers] = useState<ServerPlan[]>([]);
   const [filteredServers, setFilteredServers] = useState<ServerPlan[]>([]);
@@ -1107,6 +1118,58 @@ const ServersPage = () => {
     }
   };
 
+  // 一键监控所有产品（全机房监控）
+  const batchAddAllServersToMonitor = async () => {
+    if (!isAuthenticated) {
+      toast.error("请先配置 API 设置");
+      return;
+    }
+
+    if (servers.length === 0) {
+      toast.error("服务器列表为空，请先刷新服务器列表");
+      return;
+    }
+
+    // 显示确认对话框
+    setShowBatchMonitorDialog(true);
+  };
+
+  // 确认批量添加监控
+  const confirmBatchAddAllServersToMonitor = async () => {
+    setShowBatchMonitorDialog(false);
+
+    try {
+      const response = await api.post('/monitor/subscriptions/batch-add-all', {
+        notifyAvailable: true,
+        notifyUnavailable: true
+      });
+
+      const result = response.data;
+      
+      // 更新订阅列表
+      await loadSubscribedServers();
+      
+      // 触发重新排序
+      setServers(prevServers => [...prevServers]);
+
+      let message = `✅ 批量添加完成！\n`;
+      message += `• 已添加: ${result.added} 个服务器\n`;
+      if (result.skipped > 0) {
+        message += `• 跳过: ${result.skipped} 个已订阅服务器\n`;
+      }
+      if (result.errors && result.errors.length > 0) {
+        message += `• 失败: ${result.errors.length} 个\n`;
+      }
+      message += `\n所有服务器将监控全机房，系统会自动发送可用性通知。`;
+
+      toast.success(message, { duration: 6000 });
+    } catch (error: any) {
+      console.error("Error batch adding to monitor:", error);
+      const errorMsg = error.response?.data?.message || "批量添加监控失败";
+      toast.error(errorMsg);
+    }
+  };
+
   // 获取已订阅的服务器列表
   const loadSubscribedServers = async (): Promise<Set<string>> => {
     if (!isAuthenticated) {
@@ -1652,6 +1715,49 @@ const ServersPage = () => {
       {/* 添加全局样式 */}
       <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
 
+      {/* 批量监控确认对话框 */}
+      <AlertDialog open={showBatchMonitorDialog} onOpenChange={setShowBatchMonitorDialog}>
+        <AlertDialogContent className="bg-slate-900 border-cyber-accent/30">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-cyber-accent text-lg font-bold">
+              批量添加监控
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-200">
+              <div className="space-y-3 mt-2">
+                <p className="text-base font-medium text-white">
+                  确定要将所有 {servers.length} 台服务器添加到监控吗？
+                </p>
+                <ul className="space-y-1.5 text-sm text-slate-300 pl-4">
+                  <li className="flex items-start">
+                    <span className="text-cyber-accent mr-2">•</span>
+                    <span>将监控所有机房</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-cyber-accent mr-2">•</span>
+                    <span>自动启用有货和无货提醒</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-cyber-accent mr-2">•</span>
+                    <span>已订阅的服务器将被跳过</span>
+                  </li>
+                </ul>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white">
+              取消
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBatchAddAllServersToMonitor}
+              className="bg-blue-500 hover:bg-blue-600 text-white border-blue-600"
+            >
+              确定
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* 添加可用性检测说明 */}
       <div className="bg-cyber-accent/15 border border-cyber-accent/50 rounded-md p-2 sm:p-3 mb-3 sm:mb-4 shadow-md shadow-cyber-accent/10 overflow-hidden">
         <div className="flex items-start">
@@ -1725,6 +1831,17 @@ const ServersPage = () => {
             )}
 
             {/* 已移除紧凑模式切换，固定显示完整内容 */}
+            
+            <button
+              onClick={batchAddAllServersToMonitor}
+              disabled={!isAuthenticated || servers.length === 0}
+              className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:border-blue-500/50 rounded-md transition-all text-xs sm:text-sm font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 sm:gap-2 flex-shrink-0 whitespace-nowrap"
+              title="将所有服务器添加到监控（全机房监控）"
+            >
+              <Bell size={14} className="sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">一键监控所有</span>
+              <span className="sm:hidden">监控全部</span>
+            </button>
             
             <button
               onClick={() => fetchServers(true)}
