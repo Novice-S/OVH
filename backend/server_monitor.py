@@ -524,30 +524,48 @@ class ServerMonitor:
                     # 确保 "b64:" + encoded 不超过64字节
                     max_encoded_len = 64 - 4  # 64 - len("b64:")
                     if len(callback_data_encoded) > max_encoded_len:
-                        # 如果base64编码后仍然太长，截断原始数据（不推荐，但总比失败好）
-                        # 优先截断options列表
+                        # 如果base64编码后仍然太长，尝试先去掉options（如果存在）
                         if len(options) > 0:
-                            callback_data_truncated = {
+                            callback_data_without_options = {
                                 "a": "add_to_queue",
                                 "p": plan_code,
                                 "d": dc
-                                # 清空options，减少数据大小
+                                # 暂时去掉options，减少数据大小
                             }
-                            callback_data_str = json.dumps(callback_data_truncated, ensure_ascii=False, separators=(',', ':'))
+                            callback_data_str = json.dumps(callback_data_without_options, ensure_ascii=False, separators=(',', ':'))
                             callback_data_bytes = callback_data_str.encode('utf-8')
                             callback_data_encoded = base64.b64encode(callback_data_bytes).decode('utf-8')
+                            
                             if len(callback_data_encoded) > max_encoded_len:
-                                # 如果还是太长，直接截断JSON字符串
-                                callback_data_str = callback_data_str[:56]  # 留空间给base64编码后的扩展
+                                # 如果还是太长，去掉datacenter（可以从按钮文本推断）
+                                callback_data_minimal = {
+                                    "a": "add_to_queue",
+                                    "p": plan_code
+                                    # datacenter可以从按钮文本中提取（按钮包含dc信息）
+                                }
+                                callback_data_str = json.dumps(callback_data_minimal, ensure_ascii=False, separators=(',', ':'))
                                 callback_data_bytes = callback_data_str.encode('utf-8')
                                 callback_data_encoded = base64.b64encode(callback_data_bytes).decode('utf-8')
+                                
                                 if len(callback_data_encoded) > max_encoded_len:
-                                    callback_data_encoded = callback_data_encoded[:max_encoded_len]
+                                    # 最后手段：直接使用原始JSON截断（不推荐，但总比失败好）
+                                    callback_data_final = callback_data_str[:64]
+                                    self.add_log("WARNING", f"callback_data过大，已截断，options和datacenter可能丢失: {plan_code}", "monitor")
+                                else:
+                                    callback_data_final = "b64:" + callback_data_encoded
+                                    self.add_log("WARNING", f"callback_data过大，已去掉options和datacenter: {plan_code}, options={options}", "monitor")
+                            else:
+                                callback_data_final = "b64:" + callback_data_encoded
+                                self.add_log("WARNING", f"callback_data过大，已去掉options: {plan_code}, options={options}", "monitor")
                         else:
+                            # 如果没有options，还是太长，可能planCode或datacenter太长
                             callback_data_encoded = callback_data_encoded[:max_encoded_len]
-                    callback_data_final = "b64:" + callback_data_encoded
+                            callback_data_final = "b64:" + callback_data_encoded
+                            self.add_log("WARNING", f"callback_data仍然过大，已截断base64编码: {plan_code}", "monitor")
+                    else:
+                        callback_data_final = "b64:" + callback_data_encoded
                 else:
-                    # 原始JSON小于60字节，直接使用
+                    # 原始JSON小于等于60字节，直接使用
                     callback_data_final = callback_data_str[:64]
                 
                 row.append({

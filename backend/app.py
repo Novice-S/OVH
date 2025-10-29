@@ -2709,7 +2709,15 @@ def telegram_webhook():
             if action == "add_to_queue":
                 plan_code = callback_data_obj.get("p") or callback_data_obj.get("planCode")
                 datacenter = callback_data_obj.get("d") or callback_data_obj.get("datacenter")
-                options = callback_data_obj.get("o") if "o" in callback_data_obj else (callback_data_obj.get("options", []))
+                # 优先使用短字段名 o，如果不存在则使用长字段名 options
+                if "o" in callback_data_obj:
+                    options = callback_data_obj.get("o", [])
+                else:
+                    options = callback_data_obj.get("options", [])
+                
+                # 确保 options 是列表类型
+                if not isinstance(options, list):
+                    options = []
                 
                 if not plan_code or not datacenter:
                     return jsonify({"ok": False, "error": "Missing planCode or datacenter"}), 400
@@ -2733,7 +2741,8 @@ def telegram_webhook():
                 save_data()
                 update_stats()
                 
-                add_log("INFO", f"Telegram用户 {user_id} 通过按钮添加到队列: {plan_code}@{datacenter}", "telegram")
+                options_str = ", ".join(options) if options else "无"
+                add_log("INFO", f"Telegram用户 {user_id} 通过按钮添加到队列: {plan_code}@{datacenter}, 配置选项: {options_str}", "telegram")
                 
                 # 回复确认消息
                 tg_token = config.get("tgToken")
