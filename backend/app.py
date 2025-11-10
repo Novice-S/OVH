@@ -2431,6 +2431,7 @@ def add_subscription():
     datacenters = data.get("datacenters", [])
     notify_available = data.get("notifyAvailable", True)
     notify_unavailable = data.get("notifyUnavailable", False)
+    auto_order = data.get("autoOrder", False)
     
     if not plan_code:
         return jsonify({"status": "error", "message": "缺少planCode参数"}), 400
@@ -2447,7 +2448,7 @@ def add_subscription():
     except Exception as e:
         add_log("WARNING", f"获取服务器名称失败: {str(e)}", "monitor")
     
-    monitor.add_subscription(plan_code, datacenters, notify_available, notify_unavailable, server_name)
+    monitor.add_subscription(plan_code, datacenters, notify_available, notify_unavailable, server_name, None, None, auto_order)
     save_subscriptions()
     
     # 如果监控未运行，自动启动
@@ -4327,17 +4328,59 @@ def quick_order():
         data = request.json
         plancode = data.get('planCode')
         datacenter = data.get('datacenter')
+        options = data.get('options') or []
         
         if not plancode or not datacenter:
             return jsonify({"success": False, "error": "缺少 planCode 或 datacenter"})
-        
-        # 直接创建队列项，不检查可用性
+
+        # 若未显式传入options，则尝试基于可用性推断一个支持价格的配置（含内存+硬盘）
+        if not options:
+            try:
+                # 使用“配置级别”的可用性，包含 memory/storage 以及匹配到的 API2 addons（options）
+                availability_by_config = check_server_availability_with_configs(plancode) or {}
+                # 严格挑选：指定机房在该配置下为可售（非 unavailable/unknown），且能解析出 addons 选项
+                selected_cfg = None
+                for _, cfg in availability_by_config.items():
+                    if not isinstance(cfg, dict):
+                        continue
+                    dc_map = (cfg.get("datacenters") or {})
+                    dc_status = dc_map.get(datacenter)
+                    if dc_status and dc_status not in ["unavailable", "unknown"]:
+                        cand_opts = cfg.get("options") or []
+                        if cand_opts:
+                            selected_cfg = cfg
+                            options = cand_opts
+                            break
+                if not options:
+                    # 没有找到在该机房“可售且可定价（有addons）”的配置，直接返回 400，避免错误下单
+                    err_msg = f"指定机房无可定价配置（{plancode}@{datacenter}）"
+                    add_log("WARNING", f"[config_sniper] {err_msg}", "config_sniper")
+                    return jsonify({"success": False, "error": err_msg}), 400
+            except Exception as e:
+                add_log("WARNING", f"快速下单推断配置失败: {plancode}@{datacenter} - {str(e)}", "config_sniper")
+                # 不中断流程，继续按空options尝试价格
+
+        # 先通过临时购物车获取价格，确保该组合可下单（无价格则不支持下单）
+        price_result = _get_server_price_internal(plancode, datacenter, options)
+        if not price_result.get("success"):
+            err = price_result.get("error") or "价格查询失败"
+            add_log("WARNING", f"快速下单前价格校验失败: {plancode}@{datacenter} - {err}", "config_sniper")
+            return jsonify({"success": False, "error": f"价格校验失败：{err}"}), 400
+
+        price_payload = price_result.get("price") or {}
+        price_values = (price_payload.get("prices") or {})
+        with_tax = price_values.get("withTax")
+        if with_tax in [None, 0, 0.0]:
+            add_log("WARNING", f"快速下单前价格缺失或无效: {plancode}@{datacenter}", "config_sniper")
+            return jsonify({"success": False, "error": "该组合暂无有效价格，暂不支持下单"}), 400
+
+        # 价格校验通过后再创建队列项（不再重复检查可用性）
         current_time = datetime.now().isoformat()
         queue_item = {
             "id": str(uuid.uuid4()),
             "planCode": plancode,
             "datacenter": datacenter,
-            "options": [],
+            "options": options,
             "status": "running",
             "retryCount": 0,
             "maxRetries": 3,
@@ -4352,11 +4395,13 @@ def quick_order():
         save_data()
         update_stats()
         
-        add_log("INFO", f"快速下单: {plancode} ({datacenter}) 已加入队列", "config_sniper")
+        add_log("INFO", f"快速下单: {plancode} ({datacenter}) 已加入队列（含税价格: {with_tax}，options: {options}）", "config_sniper")
         
         return jsonify({
             "success": True,
-            "message": f"✅ {plancode} ({datacenter}) 已加入购买队列"
+            "message": f"✅ {plancode} ({datacenter}) 已加入购买队列",
+            "price": price_payload,
+            "options": options
         })
         
     except Exception as e:

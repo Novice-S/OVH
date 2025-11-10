@@ -12,6 +12,7 @@ interface Subscription {
   datacenters: string[];
   notifyAvailable: boolean;
   notifyUnavailable: boolean;
+  autoOrder?: boolean;
   lastStatus: Record<string, string>;
   createdAt: string;
 }
@@ -59,7 +60,8 @@ const MonitorPage = () => {
     planCode: '',
     datacenters: '',
     notifyAvailable: true,
-    notifyUnavailable: false
+  notifyUnavailable: false,
+  autoOrder: false
   });
 
   // 加载订阅列表
@@ -74,7 +76,48 @@ const MonitorPage = () => {
     }
     try {
       const response = await api.get('/monitor/subscriptions');
-      const newData = response.data;
+      const newData = response.data as Subscription[];
+
+      // 比对状态变化：从无货->有货 时，如启用自动下单则触发快速下单
+      const prev = prevSubscriptionsRef.current || [];
+      const prevMap = new Map(prev.map(s => [s.planCode, s]));
+      for (const sub of newData) {
+        const prevSub = prevMap.get(sub.planCode);
+        if (sub?.notifyAvailable && sub?.autoOrder && sub?.lastStatus) {
+          const keys = Object.keys(sub.lastStatus);
+          for (const key of keys) {
+            // 兼容两种格式：'dc' 或 'dc|config_key'
+            const dc = key.includes('|') ? key.split('|')[0] : key;
+            const currentStatus = (sub.lastStatus as any)[key];
+            const prevStatus = prevSub?.lastStatus ? (prevSub.lastStatus as any)[key] : undefined;
+            const isCurrentlyAvailable = currentStatus && currentStatus !== 'unavailable';
+            const wasUnavailable = prevStatus === 'unavailable';
+            const noPrevRecord = prevSub === undefined || prevStatus === undefined;
+
+            const becameAvailable = wasUnavailable && isCurrentlyAvailable;
+            const firstTimeAvailable = noPrevRecord && isCurrentlyAvailable;
+
+            if (becameAvailable || firstTimeAvailable) {
+              api.post('/config-sniper/quick-order', {
+                planCode: sub.planCode,
+                datacenter: dc
+              })
+              .then((res) => {
+                const ok = (res?.data as any)?.success !== false;
+                if (ok) {
+                  toast.success(`已自动下单：${sub.planCode}（${dc.toUpperCase()}）已加入队列`);
+                } else {
+                  toast.error(`自动下单失败：${sub.planCode}（${dc.toUpperCase()}）`);
+                }
+              })
+              .catch(() => {
+                toast.error(`自动下单失败：${sub.planCode}（${dc.toUpperCase()}）`);
+              });
+            }
+          }
+        }
+      }
+
       setSubscriptions(newData);
       prevSubscriptionsRef.current = newData;
       // 如果数据加载完成，清除延迟显示的加载状态
@@ -127,7 +170,8 @@ const MonitorPage = () => {
         planCode: formData.planCode.trim(),
         datacenters: datacenters.length > 0 ? datacenters : [],
         notifyAvailable: formData.notifyAvailable,
-        notifyUnavailable: formData.notifyUnavailable
+        notifyUnavailable: formData.notifyUnavailable,
+        autoOrder: formData.autoOrder
       });
       
       toast.success(`已订阅 ${formData.planCode}`);
@@ -135,7 +179,8 @@ const MonitorPage = () => {
         planCode: '',
         datacenters: '',
         notifyAvailable: true,
-        notifyUnavailable: false
+        notifyUnavailable: false,
+        autoOrder: false
       });
       setShowAddForm(false);
       loadSubscriptions(true);
@@ -366,6 +411,15 @@ const MonitorPage = () => {
                   />
                   <span className="text-sm">无货时提醒</span>
                 </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.autoOrder}
+                    onChange={(e) => setFormData({...formData, autoOrder: e.target.checked})}
+                    className="cyber-checkbox"
+                  />
+                  <span className="text-sm">有货自动下单</span>
+                </label>
               </div>
               <div className="flex gap-3">
                 <button 
@@ -436,6 +490,11 @@ const MonitorPage = () => {
                       {sub.notifyUnavailable && (
                         <span className="text-xs px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded">
                           无货提醒
+                        </span>
+                      )}
+                      {sub.autoOrder && (
+                        <span className="text-xs px-2 py-0.5 bg-cyber-accent/20 text-cyber-accent rounded">
+                          自动下单
                         </span>
                       )}
                     </div>

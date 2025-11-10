@@ -48,7 +48,7 @@ class ServerMonitor:
         
         self.add_log("INFO", "服务器监控器初始化完成", "monitor")
     
-    def add_subscription(self, plan_code, datacenters=None, notify_available=True, notify_unavailable=False, server_name=None, last_status=None, history=None):
+    def add_subscription(self, plan_code, datacenters=None, notify_available=True, notify_unavailable=False, server_name=None, last_status=None, history=None, auto_order=False):
         """
         添加服务器订阅
         
@@ -68,6 +68,8 @@ class ServerMonitor:
             existing["datacenters"] = datacenters or []
             existing["notifyAvailable"] = notify_available
             existing["notifyUnavailable"] = notify_unavailable
+            # 更新自动下单标记
+            existing["autoOrder"] = bool(auto_order)
             # 更新服务器名称（总是更新，即使为None也要更新）
             existing["serverName"] = server_name
             # 确保历史记录字段存在
@@ -85,6 +87,9 @@ class ServerMonitor:
             "createdAt": datetime.now().isoformat(),
             "history": history if history is not None else []  # 恢复历史记录或初始化为空
         }
+        # 自动下单标记
+        if auto_order:
+            subscription["autoOrder"] = True
         
         # 添加服务器名称（如果提供）
         if server_name:
